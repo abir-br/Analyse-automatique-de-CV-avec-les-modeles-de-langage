@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecruitAI | Classement semantique de CV</title>
+    <!-- Google Fonts - Inter pour une typographie moderne et lisible -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 pour la grille responsive et les composants de base -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Styles personnalises (couleurs, modales, animations) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- ==================== HEADER ==================== -->
+<div class="header">
+    <div class="container">
+        <div class="header-content">
+            <h1>RecruitAI</h1>
+            <p>Classement semantique de CV par similarite cosinus</p>
+            <div class="accent-line"></div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4">
+    <!-- ==================== CARTE OFFRE D'EMPLOI ==================== -->
+    <div class="card-modern">
+        <div class="card-modern-header">
+            <h2>Offre d'emploi</h2>
+            <div class="flex-row">
+                <!-- Bouton pour importer un fichier (PDF ou TXT) -->
+                <button id="importOffreBtn" class="btn-outline-custom" type="button">Importer fichier</button>
+                <!-- Bouton pour vider le champ texte -->
+                <button id="clearOffreBtn" class="btn-outline-custom" type="button">Effacer</button>
+            </div>
+        </div>
+        <div class="card-modern-body">
+            <!-- Zone de texte principale pour l'offre -->
+            <textarea id="offre" rows="6" placeholder="Collez le texte de l'offre d'emploi ou importez un fichier (PDF/TXT)..."></textarea>
+            <!-- Input cache pour la selection de fichier -->
+            <input type="file" id="offreInput" accept=".pdf,.txt" style="display: none;">
+            <!-- Affichage du nom du fichier importe -->
+            <div id="offreFileName" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem;"></div>
+        </div>
+    </div>
+
+    <!-- ==================== CARTE UPLOAD CVs ==================== -->
+    <div class="card-modern">
+        <div class="card-modern-header">
+            <h2>CVs candidats</h2>
+            <!-- Compteur de fichiers uploades -->
+            <span style="font-size: 0.7rem; color: var(--text-muted);" id="cvCount">0 fichier</span>
+        </div>
+        <div class="card-modern-body">
+            <!-- Zone de drag & drop pour les CVs -->
+            <div id="dropzone" class="upload-zone">
+                <!-- Icone SVG d'upload -->
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted); margin-bottom: 0.5rem;">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <path d="M12 18v-6"/>
+                    <path d="M9 15l3-3 3 3"/>
+                </svg>
+                <p>Glissez vos fichiers PDF ou cliquez pour selectionner</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted);">PDF uniquement</p>
+                <!-- Input cache pour la selection multiple -->
+                <input type="file" id="cvInput" multiple accept=".pdf" style="display: none;">
+            </div>
+            <!-- Liste des fichiers uploades (tags) -->
+            <div id="fileList" class="file-list"></div>
+        </div>
+    </div>
+
+    <!-- ==================== CARTE PARAMETRES ==================== -->
+    <div class="card-modern">
+        <div class="card-modern-header">
+            <h2>Parametres</h2>
+        </div>
+        <div class="card-modern-body">
+            <div class="flex-row mb-3">
+                <label style="font-size: 0.875rem; font-weight: 500;">Strategie de decoupage</label>
+                <!-- Selection de la strategie de chunking -->
+                <select id="strategy">
+                    <option value="adaptatif">Adaptatif (recommandee)</option>
+                    <option value="newlines">Sauts de ligne</option>
+                    <option value="words">Taille fixe</option>
+                    <option value="sentences">Par phrases</option>
+                </select>
+            </div>
+            <!-- Bouton principal de lancement -->
+            <button id="rankBtn" class="btn-primary-custom" type="button">Lancer le classement</button>
+        </div>
+    </div>
+
+    <!-- ==================== SECTION RESULTATS ==================== -->
+    <!-- Cachee par defaut, affichee apres le classement -->
+    <div id="resultsSection" style="display: none;">
+        <div class="card-modern">
+            <div class="card-modern-header">
+                <h2>Classement des candidats</h2>
+            </div>
+            <div class="card-modern-body">
+                <!-- Liste dynamique des candidats classes -->
+                <div id="resultsList" class="results-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== LOADING SPINNER ==================== -->
+    <!-- Affiche un spinner pendant le traitement -->
+    <div id="loading" style="display: none;">
+        <div class="card-modern">
+            <div class="loading-overlay">
+                <div class="spinner-custom"></div>
+                <p>Analyse des CVs en cours...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== FOOTER ==================== -->
+<footer>
+    <p>Modele: paraphrase-multilingual-MiniLM-L12-v2 | Similarite cosinus | Flask + sentence-transformers</p>
+</footer>
+
+<!-- ==================== MODALE FICHE CANDIDAT ==================== -->
+<!-- Popup qui s'ouvre quand on clique sur un candidat -->
+<div id="candidateModal" class="modal-custom">
+    <div class="modal-content-custom">
+        <div class="modal-header-custom">
+            <h3 id="modalTitle">Fiche candidat</h3>
+            <button class="modal-close" id="closeModalBtn">&times;</button>
+        </div>
+        <div class="modal-body-custom" id="modalBody"></div>
+    </div>
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+    // ========== VARIABLES GLOBALES ==========
+    let pdfjsLib = null;           // Bibliotheque PDF.js pour l'extraction de texte
+    let uploadedFiles = [];        // Liste des CVs uploades
+    let currentResults = [];       // Resultats du dernier classement
+
+    // ========== CHARGEMENT DE PDF.JS ==========
+    // Charge la bibliotheque PDF.js depuis le CDN une seule fois
+    function loadPDFJS() {
+        return new Promise((resolve) => {
+            if (window.pdfjsLib) {
+                pdfjsLib = window.pdfjsLib;
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js';
+            script.onload = () => {
+                pdfjsLib = window.pdfjsLib;
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('Erreur chargement PDF.js');
+                resolve();
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    // ========== EXTRACTION TEXTE PDF (CLIENT) ==========
+    // Utilise PDF.js pour extraire le texte d'un fichier PDF
+    async function extractTextFromPDF(file) {
+        await loadPDFJS();
+        if (!pdfjsLib) return "Impossible de lire le PDF";
+        
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                    let fullText = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + "\n\n";
+                    }
+                    resolve(fullText.trim());
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // ========== EXTRACTION TEXTE TXT ==========
+    // Lecture simple d'un fichier texte
+    async function extractTextFromTXT(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsText(file, 'UTF-8');
+        });
+    }
+
+    // ========== REFERENCES DES ELEMENTS DOM ==========
+    const dropzone = document.getElementById('dropzone');
+    const cvInput = document.getElementById('cvInput');
+    const fileListDiv = document.getElementById('fileList');
+    const rankBtn = document.getElementById('rankBtn');
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsList = document.getElementById('resultsList');
+    const loadingDiv = document.getElementById('loading');
+    const offreTextarea = document.getElementById('offre');
+    const offreInput = document.getElementById('offreInput');
+    const importOffreBtn = document.getElementById('importOffreBtn');
+    const clearOffreBtn = document.getElementById('clearOffreBtn');
+    const offreFileName = document.getElementById('offreFileName');
+    const cvCountSpan = document.getElementById('cvCount');
+    const modal = document.getElementById('candidateModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+
+    // ========== GESTION DE LA LISTE DES CVs ==========
+    // Met a jour l'affichage des tags de fichiers
+    function updateFileList() {
+        fileListDiv.innerHTML = '';
+        uploadedFiles.forEach((file, idx) => {
+            const tag = document.createElement('div');
+            tag.className = 'file-tag';
+            tag.innerHTML = `${file.name} <button data-idx="${idx}">×</button>`;
+            fileListDiv.appendChild(tag);
+        });
+        cvCountSpan.textContent = `${uploadedFiles.length} fichier${uploadedFiles.length > 1 ? 's' : ''}`;
+        
+        // Ajout des ecouteurs de suppression sur chaque tag
+        document.querySelectorAll('.file-tag button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.idx);
+                uploadedFiles.splice(idx, 1);
+                updateFileList();
+            });
+        });
+    }
+
+    // Ajoute des fichiers a la liste
+    function handleFiles(files) {
+        const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+        uploadedFiles.push(...pdfFiles);
+        updateFileList();
+    }
+
+    // ========== GESTION DE L'OFFRE D'EMPLOI ==========
+    importOffreBtn.addEventListener('click', () => offreInput.click());
+    clearOffreBtn.addEventListener('click', () => {
+        offreTextarea.value = '';
+        offreFileName.textContent = '';
+    });
+
+    // Import d'un fichier offre (PDF ou TXT)
+    offreInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        offreFileName.textContent = `Chargement: ${file.name}...`;
+        try {
+            let text = '';
+            if (file.type === 'application/pdf') {
+                text = await extractTextFromPDF(file);
+            } else {
+                text = await extractTextFromTXT(file);
+            }
+            offreTextarea.value = text;
+            offreFileName.textContent = `Fichier importe: ${file.name} (${text.length} caracteres)`;
+        } catch (err) {
+            console.error(err);
+            offreFileName.textContent = `Erreur lors de l'import de ${file.name}`;
+        }
+        offreInput.value = '';
+    });
+
+    // ========== DRAG & DROP POUR LES CVs ==========
+    dropzone.addEventListener('click', () => cvInput.click());
+    cvInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('drag-over');
+    });
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('drag-over');
+    });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    // ========== LANCEMENT DU CLASSEMENT ==========
+    rankBtn.addEventListener('click', async () => {
+        const offre = offreTextarea.value.trim();
+        if (!offre) {
+            alert('Veuillez renseigner une offre d\'emploi');
+            return;
+        }
+        if (uploadedFiles.length === 0) {
+            alert('Veuillez ajouter au moins un CV');
+            return;
+        }
+
+        const strategy = document.getElementById('strategy').value;
+        const formData = new FormData();
+        formData.append('offre', offre);
+        formData.append('strategy', strategy);
+        uploadedFiles.forEach(file => formData.append('cvs', file));
+
+        // Afficher le spinner
+        loadingDiv.style.display = 'block';
+        resultsSection.style.display = 'none';
+        rankBtn.disabled = true;
+
+        try {
+            const response = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await response.json();
+            if (data.error) {
+                alert('Erreur: ' + data.error);
+                return;
+            }
+            currentResults = data.results;
+            displayResults(currentResults);
+            resultsSection.style.display = 'block';
+        } catch (error) {
+            console.error(error);
+            alert('Erreur lors du classement: ' + error.message);
+        } finally {
+            loadingDiv.style.display = 'none';
+            rankBtn.disabled = false;
+        }
+    });
+
+    // ========== EXTRACTION D'INFORMATIONS (REGEX) ==========
+    // Extrait email, telephone, linkedin, localisation depuis le texte
+    function extractInfoFromText(text) {
+        const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+        const phoneMatch = text.match(/[\+0-9][0-9\s]{8,15}/);
+        const linkedinMatch = text.match(/linkedin\.com\/in\/[a-zA-Z0-9-]+/);
+        const locationMatch = text.match(/(?:Lyon|Paris|Grenoble|Marseille|Bordeaux|Nantes|Toulouse|Nice|Montpellier)[,\s]*(?:France)?/i);
+        
+        return {
+            email: emailMatch ? emailMatch[0] : null,
+            phone: phoneMatch ? phoneMatch[0].trim() : null,
+            linkedin: linkedinMatch ? linkedinMatch[0] : null,
+            location: locationMatch ? locationMatch[0] : null
+        };
+    }
+
+    // ========== DETECTION DE COMPETENCES ==========
+    // Liste de mots-cles techniques a rechercher dans le CV
+    function extractCompetences(text) {
+        const keywords = [
+            'Python', 'NLP', 'FastAPI', 'Flask', 'Docker', 'Git', 'GitHub',
+            'Embeddings', 'similarite cosinus', 'BERT', 'HuggingFace', 'Transformers',
+            'spaCy', 'NLTK', 'LLM', 'RAG', 'SQL', 'PyTorch', 'TensorFlow',
+            'scikit-learn', 'Pandas', 'NumPy', 'API', 'Cloud', 'AWS', 'Azure',
+            'MongoDB', 'PostgreSQL', 'CI/CD', 'Agile', 'Scrum'
+        ];
+        const found = [];
+        const textLower = text.toLowerCase();
+        for (const kw of keywords) {
+            if (textLower.includes(kw.toLowerCase())) {
+                found.push(kw);
+            }
+        }
+        return found.slice(0, 15);  // Limite a 15 competences
+    }
+
+    // ========== MODALE CV COMPLET ==========
+    // Ouvre une nouvelle fenetre avec le texte integral du CV
+    function openFullCvModal(candidate) {
+        const texteComplet = candidate.cv_complet || candidate.extrait;
+        
+        const fullModal = document.createElement('div');
+        fullModal.className = 'modal-custom';
+        fullModal.innerHTML = `
+            <div class="modal-content-custom" style="max-width: 800px;">
+                <div class="modal-header-custom">
+                    <h3>CV complet - ${escapeHtml(candidate.nom)}</h3>
+                    <button class="modal-close close-full-modal">&times;</button>
+                </div>
+                <div class="modal-body-custom">
+                    <div class="txt-viewer">${escapeHtml(texteComplet)}</div>
+                    <div class="flex-row" style="margin-top: 1rem;">
+                        <button class="btn-outline-custom copy-full-txt" type="button">Copier le texte</button>
+                        <button class="btn-outline-custom download-full-txt" type="button">Telecharger en .txt</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(fullModal);
+        fullModal.classList.add('active');
+        
+        // Fermeture de la modale
+        fullModal.querySelector('.close-full-modal').addEventListener('click', () => fullModal.remove());
+        fullModal.addEventListener('click', (e) => { if (e.target === fullModal) fullModal.remove(); });
+        
+        // Copie du texte
+        fullModal.querySelector('.copy-full-txt').addEventListener('click', () => {
+            navigator.clipboard.writeText(texteComplet);
+            alert('CV copie dans le presse-papier');
+        });
+        
+        // Telechargement du fichier TXT
+        fullModal.querySelector('.download-full-txt').addEventListener('click', () => {
+            const blob = new Blob([texteComplet], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${candidate.nom.replace(/[^a-z0-9]/gi, '_')}_cv.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // ========== MODALE FICHE CANDIDAT ==========
+    // Affiche les details d'un candidat (score, infos, competences)
+    function openCandidateModal(candidate, index) {
+        const info = extractInfoFromText(candidate.cv_complet || candidate.extrait);
+        const competences = extractCompetences(candidate.cv_complet || candidate.extrait);
+        const rank = index + 1;
+        
+        modalTitle.textContent = candidate.nom;
+        modalBody.innerHTML = `
+            <!-- Score et barre de progression -->
+            <div class="mb-3">
+                <div class="flex-row justify-content-between align-items-center mb-2">
+                    <span class="rank-badge">${rank} / ${currentResults.length}</span>
+                    <span style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">${(candidate.score * 100).toFixed(1)}%</span>
+                </div>
+                <div class="score-bar-container">
+                    <div class="score-bar" style="width: ${candidate.score * 100}%"></div>
+                </div>
+            </div>
+
+            <!-- Informations personnelles extraites -->
+            <div class="mb-3">
+                <div class="info-label">Informations</div>
+                <div class="info-grid">
+                    ${info.email ? `<div><div class="info-label">Email</div><div class="info-value">${escapeHtml(info.email)}</div></div>` : ''}
+                    ${info.phone ? `<div><div class="info-label">Telephone</div><div class="info-value">${escapeHtml(info.phone)}</div></div>` : ''}
+                    ${info.location ? `<div><div class="info-label">Localisation</div><div class="info-value">${escapeHtml(info.location)}</div></div>` : ''}
+                    ${info.linkedin ? `<div><div class="info-label">LinkedIn</div><div class="info-value"><a href="https://${info.linkedin}" target="_blank" style="color: var(--accent);">${info.linkedin}</a></div></div>` : ''}
+                </div>
+            </div>
+
+            <!-- Bloc de texte qui a donne le meilleur score -->
+            <div class="mb-3">
+                <div class="info-label">Bloc decisif</div>
+                <div class="bloc-decisif-modal">${escapeHtml(candidate.meilleur_bloc || 'Aucun bloc significatif')}</div>
+            </div>
+
+            <!-- Tags de competences detectees -->
+            ${competences.length > 0 ? `
+            <div class="mb-3">
+                <div class="info-label">Competences detectees</div>
+                <div class="competences-list">
+                    ${competences.map(c => `<span class="competence-tag">${escapeHtml(c)}</span>`).join('')}
+                </div>
+            </div>
+            ` : ''}
+
+            <!-- Statistiques du CV -->
+            <div class="mb-3">
+                <div class="info-label">Statistiques</div>
+                <div class="flex-row">
+                    <span class="badge-stat">Blocs: ${candidate.nb_blocs}</span>
+                    <span class="badge-stat">Bloc decisif: ${candidate.meilleur_idx + 1}</span>
+                    <span class="badge-stat">Taille: ${candidate.taille_cv} caracteres</span>
+                </div>
+            </div>
+
+            <!-- Boutons d'action -->
+            <div class="flex-row">
+                <button class="btn-outline-custom" id="viewFullCvBtn" type="button">Voir CV complet</button>
+                <button class="btn-outline-custom" id="copyExtraitBtn" type="button">Copier le CV</button>
+            </div>
+        `;
+        
+        modal.classList.add('active');
+        
+        // Ecouteurs des boutons de la modale
+        document.getElementById('viewFullCvBtn').addEventListener('click', () => openFullCvModal(candidate));
+        document.getElementById('copyExtraitBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(candidate.cv_complet || candidate.extrait);
+            alert('CV copie dans le presse-papier');
+        });
+    }
+
+    // ========== AFFICHAGE DES RESULTATS ==========
+    // Cree les cartes de candidats dans la liste de classement
+    function displayResults(results) {
+        resultsList.innerHTML = '';
+        results.forEach((cv, idx) => {
+            const rank = idx + 1;
+            const rankClass = rank === 1 ? 'rank-1' : '';
+            const card = document.createElement('div');
+            card.className = `candidate-card ${rankClass}`;
+            card.onclick = () => openCandidateModal(cv, idx);
+            card.innerHTML = `
+                <div class="candidate-header">
+                    <div class="candidate-name">${escapeHtml(cv.nom)}${rank === 1 ? ' · Meilleur candidat' : ''}</div>
+                    <div class="candidate-score">${(cv.score * 100).toFixed(1)}%</div>
+                </div>
+                <div class="score-bar-container">
+                    <div class="score-bar" style="width: ${cv.score * 100}%"></div>
+                </div>
+                <div class="candidate-meta">
+                    ${cv.nb_blocs} blocs analyses · Bloc decisif ${cv.meilleur_idx + 1} · ${cv.taille_cv} caracteres
+                </div>
+            `;
+            resultsList.appendChild(card);
+        });
+    }
+
+    // ========== SECURITE HTML ==========
+    // Echappe les caracteres speciaux pour eviter les failles XSS
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ========== FERMETURE DE LA MODALE ==========
+    closeModalBtn.addEventListener('click', () => modal.classList.remove('active'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('active')) modal.classList.remove('active'); });
+</script>
+</body>
+</html>
