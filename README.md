@@ -1,4 +1,4 @@
-# RecruitAI — Analyse et Classement Automatique de CV par Similarité Sémantique
+# Analyse et Classement Automatique de CV par Similarité Sémantique
 
 Application web permettant de classer automatiquement des CV (PDF) par pertinence par rapport à une offre d'emploi, à l'aide d'**embeddings de phrases** (`sentence-transformers`) et de la **similarité cosinus**. Développée avec **Flask**, **PyMuPDF** et **scikit-learn**.
 
