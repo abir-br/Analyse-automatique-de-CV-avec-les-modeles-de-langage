@@ -8,21 +8,22 @@ Projet réalisé dans le cadre d'un TER (Travail d'Étude et de Recherche) — v
 
 ## Structure du projet
 
-```
+\```
 Analyse-automatique-de-CV-avec-les-modeles-de-langage-main/
-├── RAPPORT PROJET TER.pdf             
+├── RAPPORT PROJET TER.pdf
 └── RecruitAI_Code_GBL_ALM/
-    ├── app.py                          
-    ├── requirements.txt                
-    ├── Documentation.pdf                
-    ├── cv_to_texte.ipynb                
-    ├── cv_to_texte.pdf                  
-    ├── Strategy_choice.ipynb            
-    ├── Strategy_choice.pdf             
+    ├── app.py
+    ├── requirements.txt
+    ├── Documentation.pdf
+    ├── cv_to_texte.ipynb
+    ├── cv_to_texte.pdf
+    ├── Strategy_choice.ipynb
+    ├── Strategy_choice.pdf
     ├── static/
-    │   └── style.css                  
+    │   └── style.css
     └── templates/
-        └── index.html                  
+        └── index.html
+\```
 
 ---
 
@@ -35,7 +36,7 @@ Le texte est extrait des PDF via **PyMuPDF (fitz)**, avec un traitement avancé 
 - **Nettoyage du texte** (`nettoyer_cv_final`, `supprimer_emojis_et_symboles_inutiles`) : suppression des emojis/symboles, normalisation des puces, conversion des barres de progression graphiques (`███░░`) en niveaux textuels (`niveau 3/5`).
 - **OCR de secours** (`pytesseract`) : activable pour les CV scannés (image) si le texte extrait est trop court.
 
->  Toute cette logique a été mise au point et testée pas à pas dans le notebook `cv_to_texte.ipynb`, avant son intégration dans `app.py`.
+> Toute cette logique a été mise au point et testée pas à pas dans le notebook `cv_to_texte.ipynb`, avant son intégration dans `app.py`.
 
 ### 2. Prétraitement et découpage en blocs (chunking)
 Avant l'analyse sémantique, chaque CV est découpé en blocs (`pretraiter_cv` + stratégie de chunking). Quatre stratégies principales sont proposées dans l'interface, plus une cinquième utilisée en interne :
@@ -61,6 +62,7 @@ Avant l'analyse sémantique, chaque CV est découpé en blocs (`pretraiter_cv` +
 - Sélecteur de stratégie de chunking.
 - Affichage des résultats classés avec score de similarité et extrait du bloc le plus pertinent.
 
+---
 
 ## Notebooks d'expérimentation
 
@@ -80,7 +82,7 @@ Ce notebook constitue la justification expérimentale du choix de la stratégie 
 
 ## Installation
 
-```bash
+\```bash
 cd RecruitAI_Code_GBL_ALM
 
 # (recommandé) créer un environnement virtuel
@@ -89,17 +91,12 @@ source venv/bin/activate   # Linux/macOS
 venv\Scripts\activate      # Windows
 
 pip install -r requirements.txt
-```
-
-
+\```
 
 ## Exécution
 
-```bash
+\```bash
 python app.py
-```
+\```
 
 Le serveur démarre sur `http://localhost:5000` (chargement du modèle `sentence-transformers` au démarrage, ce qui peut prendre quelques secondes).
-
----
-
