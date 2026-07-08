@@ -10,19 +10,19 @@ Projet réalisé dans le cadre d'un TER (Travail d'Étude et de Recherche) — v
 
 ```
 Analyse-automatique-de-CV-avec-les-modeles-de-langage-main/
-├── RAPPORT PROJET TER.pdf              # Rapport détaillant la méthodologie et les résultats du TER
+├── RAPPORT PROJET TER.pdf              
 └── RecruitAI_Code_GBL_ALM/
-    ├── app.py                          # Application Flask : extraction PDF, chunking, classement
-    ├── requirements.txt                # Dépendances Python
-    ├── Documentation.pdf                # Documentation technique du code (app.py)
-    ├── cv_to_texte.ipynb                # Notebook d'exploration : extraction et nettoyage du texte des CV
-    ├── cv_to_texte.pdf                  # Export PDF du notebook cv_to_texte
-    ├── Strategy_choice.ipynb            # Notebook d'expérimentation : comparaison des stratégies de chunking
-    ├── Strategy_choice.pdf              # Export PDF du notebook Strategy_choice
+    ├── app.py                          
+    ├── requirements.txt                
+    ├── Documentation.pdf               
+    ├── cv_to_texte.ipynb               
+    ├── cv_to_texte.pdf                  
+    ├── Strategy_choice.ipynb            
+    ├── Strategy_choice.pdf              
     ├── static/
-    │   └── style.css                   # Feuille de style (thème moderne, cartes, drag&drop)
+    │   └── style.css                   
     └── templates/
-        └── index.html                  # Interface : offre d'emploi + upload des CV + résultats
+        └── index.html                  
 ```
 
 ---
@@ -36,7 +36,7 @@ Le texte est extrait des PDF via **PyMuPDF (fitz)**, avec un traitement avancé 
 - **Nettoyage du texte** (`nettoyer_cv_final`, `supprimer_emojis_et_symboles_inutiles`) : suppression des emojis/symboles, normalisation des puces, conversion des barres de progression graphiques (`███░░`) en niveaux textuels (`niveau 3/5`).
 - **OCR de secours** (`pytesseract`) : activable pour les CV scannés (image) si le texte extrait est trop court.
 
-> 🧪 Toute cette logique a été mise au point et testée pas à pas dans le notebook `cv_to_texte.ipynb`, avant son intégration dans `app.py`.
+>  Toute cette logique a été mise au point et testée pas à pas dans le notebook `cv_to_texte.ipynb`, avant son intégration dans `app.py`.
 
 ### 2. Prétraitement et découpage en blocs (chunking)
 Avant l'analyse sémantique, chaque CV est découpé en blocs (`pretraiter_cv` + stratégie de chunking). Quatre stratégies principales sont proposées dans l'interface, plus une cinquième utilisée en interne :
@@ -100,10 +100,7 @@ venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 ```
 
-Dépendances principales : `flask==3.0.0`, `sentence-transformers==2.2.2`, `transformers==4.36.2`, `torch==2.1.2`, `scikit-learn==1.3.2`, `numpy==1.24.3`, `PyMuPDF==1.23.8`, `pytesseract==0.3.10`, `Pillow==10.1.0`.
 
-> ℹ️ `pytesseract` nécessite également l'installation du binaire **Tesseract OCR** sur le système si l'OCR de secours doit être utilisé sur des CV scannés.
-> ℹ️ Pour exécuter les notebooks (`cv_to_texte.ipynb`, `Strategy_choice.ipynb`), installer en plus `jupyter` et `scipy` (utilisé pour la corrélation de Spearman).
 
 ## Exécution
 
@@ -115,10 +112,4 @@ Le serveur démarre sur `http://localhost:5000` (chargement du modèle `sentence
 
 ---
 
-## Points clés
 
-- **Reconstruction intelligente du texte** : la gestion des CV en colonnes (souvent mal gérés par une extraction PDF naïve) est un point fort du projet — elle évite de mélanger le texte de deux colonnes différentes.
-- **Chunking adaptatif** : contrairement à un découpage fixe, la stratégie recommandée s'ajuste à la structure du CV et fusionne les blocs sémantiquement proches, ce qui améliore la pertinence du score de similarité.
-- **Choix de stratégie justifié expérimentalement** : `Strategy_choice.ipynb` compare objectivement 6 approches (dont une stratégie de fusion pondérée) via des métriques de classement (Spearman, NDCG), plutôt qu'un choix arbitraire.
-- **Modèle multilingue** : `paraphrase-multilingual-MiniLM-L12-v2` permet de comparer des CV et offres en français et en anglais.
-- **Limites / améliorations possibles** : le score retenu est le *meilleur bloc* du CV (et non une moyenne pondérée), ce qui peut avantager les CV très longs ; l'OCR est désactivé par défaut (`activer_ocr=False`) dans la route `/upload` ; la stratégie de fusion pondérée testée dans le notebook n'est pas encore proposée dans l'interface web.
