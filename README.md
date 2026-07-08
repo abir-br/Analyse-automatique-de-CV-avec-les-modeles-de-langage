@@ -85,7 +85,7 @@ Ce notebook constitue la justification expérimentale du choix de la stratégie 
 \```bash
 cd RecruitAI_Code_GBL_ALM
 
-# (recommandé) créer un environnement virtuel
+ (recommandé) créer un environnement virtuel
 python -m venv venv
 source venv/bin/activate   # Linux/macOS
 venv\Scripts\activate      # Windows
